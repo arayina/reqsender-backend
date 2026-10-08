@@ -1,5 +1,6 @@
 import asyncio
 import random
+import time
 from collections.abc import AsyncIterator
 from uuid import UUID
 
@@ -42,7 +43,9 @@ class ExecutionService:
             )
 
         if mode == "random":
-            selected_mode = random.choice(["http", "browser"])
+            selected_mode = random.choice(
+                ["http", "browser"]
+            )
 
             if selected_mode == "http":
                 return await execute_http_request(
@@ -55,7 +58,9 @@ class ExecutionService:
                 proxy=proxy,
             )
 
-        raise ValueError(f"Unsupported request mode: {mode}")
+        raise ValueError(
+            f"Unsupported request mode: {mode}"
+        )
 
     async def execute_batch_stream(
         self,
@@ -67,14 +72,66 @@ class ExecutionService:
     ) -> AsyncIterator[dict]:
         semaphore = asyncio.Semaphore(concurrency)
 
+        started_at = time.perf_counter()
+
         completed = 0
         success = 0
         failed = 0
+        total_latency_ms = 0.0
 
-        async def execute_one(index: int) -> dict:
+        tasks: set[asyncio.Task] = set()
+
+        def build_metrics() -> dict:
+            elapsed_ms = (
+                time.perf_counter() - started_at
+            ) * 1000
+
+            elapsed_seconds = elapsed_ms / 1000
+
+            average_latency_ms = (
+                total_latency_ms / completed
+                if completed > 0
+                else 0
+            )
+
+            requests_per_second = (
+                completed / elapsed_seconds
+                if elapsed_seconds > 0
+                else 0
+            )
+
+            success_rate = (
+                (success / completed) * 100
+                if completed > 0
+                else 0
+            )
+
+            return {
+                "elapsed_ms": round(
+                    elapsed_ms,
+                    2,
+                ),
+                "average_latency_ms": round(
+                    average_latency_ms,
+                    2,
+                ),
+                "requests_per_second": round(
+                    requests_per_second,
+                    2,
+                ),
+                "success_rate": round(
+                    success_rate,
+                    2,
+                ),
+            }
+
+        async def execute_one_task(
+            index: int,
+        ) -> dict:
             nonlocal completed
             nonlocal success
             nonlocal failed
+            nonlocal total_latency_ms
 
             async with semaphore:
                 try:
@@ -83,6 +140,10 @@ class ExecutionService:
                         proxy_id=proxy_id,
                         mode=mode,
                     )
+
+                except asyncio.CancelledError:
+                    raise
+
                 except Exception as exc:
                     result = {
                         "success": False,
@@ -94,6 +155,13 @@ class ExecutionService:
                     }
 
                 completed += 1
+
+                latency_ms = result.get(
+                    "latency_ms",
+                    0,
+                ) or 0
+
+                total_latency_ms += latency_ms
 
                 if result["success"]:
                     success += 1
@@ -108,36 +176,55 @@ class ExecutionService:
                     "success": success,
                     "failed": failed,
                     "result": result,
+                    "metrics": build_metrics(),
                 }
 
-        tasks = [
-            asyncio.create_task(execute_one(index))
-            for index in range(1, count + 1)
-        ]
+        try:
+            yield {
+                "type": "started",
+                "total": count,
+                "success": 0,
+                "failed": 0,
+                "completed": 0,
+                "metrics": build_metrics(),
+            }
 
-        yield {
-            "type": "started",
-            "total": count,
-            "success": 0,
-            "failed": 0,
-            "completed": 0,
-        }
+            tasks = {
+                asyncio.create_task(
+                    execute_one_task(index)
+                )
+                for index in range(1, count + 1)
+            }
 
-        pending = set(tasks)
+            pending = tasks.copy()
 
-        while pending:
-            done, pending = await asyncio.wait(
-                pending,
-                return_when=asyncio.FIRST_COMPLETED,
-            )
+            while pending:
+                done, pending = await asyncio.wait(
+                    pending,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
 
-            for task in done:
-                yield task.result()
+                for task in done:
+                    yield task.result()
 
-        yield {
-            "type": "completed",
-            "total": count,
-            "success": success,
-            "failed": failed,
-            "completed": completed,
-        }
+            yield {
+                "type": "completed",
+                "total": count,
+                "success": success,
+                "failed": failed,
+                "completed": completed,
+                "metrics": build_metrics(),
+            }
+
+        finally:
+            # If the client disconnects / aborts the SSE stream,
+            # cancel every task that is still running or waiting.
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+
+            if tasks:
+                await asyncio.gather(
+                    *tasks,
+                    return_exceptions=True,
+                )
