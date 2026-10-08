@@ -10,7 +10,7 @@ class ProxyService:
         self.repository = repository
 
     def create_proxy(self, data: ProxyCreate) -> Proxy:
-        proxy = Proxy.create(
+        proxy = Proxy(
             host=data.host,
             port=data.port,
             protocol=data.protocol,

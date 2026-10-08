@@ -1,25 +1,39 @@
 from uuid import UUID
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.models.proxy import Proxy
 
 
 class ProxyRepository:
-    def __init__(self):
-        self._proxies: dict[UUID, Proxy] = {}
+    def __init__(self, db: Session):
+        self.db = db
 
     def create(self, proxy: Proxy) -> Proxy:
-        self._proxies[proxy.id] = proxy
+        self.db.add(proxy)
+        self.db.commit()
+        self.db.refresh(proxy)
+
         return proxy
 
     def get_all(self) -> list[Proxy]:
-        return list(self._proxies.values())
+        statement = select(Proxy)
+
+        return list(
+            self.db.scalars(statement).all()
+        )
 
     def get_by_id(self, proxy_id: UUID) -> Proxy | None:
-        return self._proxies.get(proxy_id)
+        return self.db.get(Proxy, proxy_id)
 
     def delete(self, proxy_id: UUID) -> bool:
-        if proxy_id not in self._proxies:
+        proxy = self.db.get(Proxy, proxy_id)
+
+        if proxy is None:
             return False
 
-        del self._proxies[proxy_id]
+        self.db.delete(proxy)
+        self.db.commit()
+
         return True

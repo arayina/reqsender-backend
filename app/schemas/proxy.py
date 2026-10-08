@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProxyCreate(BaseModel):
@@ -13,6 +13,8 @@ class ProxyCreate(BaseModel):
 
 
 class ProxyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     host: str
     port: int
