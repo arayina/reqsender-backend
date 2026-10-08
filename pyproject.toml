@@ -1,0 +1,11 @@
+[project]
+name = "proxy-manager-backend"
+version = "0.1.0"
+description = "Backend API for Proxy Manager"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.143.0",
+    "python-dotenv>=1.2.4",
+    "uvicorn[standard]>=0.54.0",
+]
