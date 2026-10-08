@@ -21,3 +21,11 @@ class ProxyResponse(BaseModel):
     protocol: str
     username: str | None = None
     enabled: bool
+    
+class ProxyUpdate(BaseModel):
+    host: str | None = Field(default=None, min_length=1)
+    port: int | None = Field(default=None, gt=0, le=65535)
+    protocol: str | None = None
+    username: str | None = None
+    password: str | None = None
+    enabled: bool | None = None

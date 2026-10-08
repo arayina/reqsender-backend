@@ -37,3 +37,17 @@ class ProxyRepository:
         self.db.commit()
 
         return True
+    
+    def update(self, proxy_id: UUID, data: dict) -> Proxy | None:
+        proxy = self.db.get(Proxy, proxy_id)
+
+        if proxy is None:
+            return None
+
+        for field, value in data.items():
+            setattr(proxy, field, value)
+
+        self.db.commit()
+        self.db.refresh(proxy)
+
+        return proxy

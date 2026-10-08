@@ -5,9 +5,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.repositories.proxy_repository import ProxyRepository
-from app.schemas.proxy import ProxyCreate, ProxyResponse
 from app.services.proxy_service import ProxyService
-
+from app.schemas.proxy import (
+    ProxyCreate,
+    ProxyResponse,
+    ProxyUpdate,
+)
 
 router = APIRouter(
     prefix="/proxies",
@@ -79,3 +82,25 @@ def delete_proxy(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Proxy not found",
         )
+        
+@router.patch(
+    "/{proxy_id}",
+    response_model=ProxyResponse,
+)
+def update_proxy(
+    proxy_id: UUID,
+    data: ProxyUpdate,
+    service: ProxyService = Depends(get_proxy_service),
+):
+    proxy = service.update_proxy(
+        proxy_id,
+        data,
+    )
+
+    if proxy is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Proxy not found",
+        )
+
+    return proxy

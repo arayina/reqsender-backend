@@ -2,8 +2,7 @@ from uuid import UUID
 
 from app.models.proxy import Proxy
 from app.repositories.proxy_repository import ProxyRepository
-from app.schemas.proxy import ProxyCreate
-
+from app.schemas.proxy import ProxyCreate, ProxyUpdate
 
 class ProxyService:
     def __init__(self, repository: ProxyRepository):
@@ -29,3 +28,16 @@ class ProxyService:
 
     def delete_proxy(self, proxy_id: UUID) -> bool:
         return self.repository.delete(proxy_id)
+    
+    
+    def update_proxy(
+        self,
+        proxy_id: UUID,
+        data: ProxyUpdate,
+    ) -> Proxy | None:
+        update_data = data.model_dump(exclude_unset=True)
+
+        return self.repository.update(
+            proxy_id,
+            update_data,
+        )
