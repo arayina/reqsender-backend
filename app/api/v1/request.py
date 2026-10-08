@@ -11,6 +11,13 @@ from app.schemas.request import (
 )
 from app.services.request_service import RequestService
 
+import json
+
+from fastapi.responses import StreamingResponse
+
+
+from app.services.execution_service import ExecutionService
+
 
 router = APIRouter(
     prefix="/requests",
@@ -81,3 +88,43 @@ async def execute_batch_request(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         )
+        
+def get_execution_service(
+    db: Session = Depends(get_db),
+) -> ExecutionService:
+    return ExecutionService(
+        proxy_repository=ProxyRepository(db),
+    )
+    
+@router.post("/batch/stream")
+async def execute_batch_stream(
+    data: BatchRequestCreate,
+    service: ExecutionService = Depends(get_execution_service),
+):
+    async def event_generator():
+        try:
+            async for event in service.execute_batch_stream(
+                url=data.url,
+                proxy_id=data.proxy_id,
+                mode=data.mode,
+                count=data.count,
+                concurrency=data.concurrency,
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+
+        except Exception as exc:
+            error_event = {
+                "type": "error",
+                "error": str(exc),
+            }
+
+            yield f"data: {json.dumps(error_event)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
