@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: url-req-sender-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: url_request_sender
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
