@@ -1,33 +1,63 @@
-from dataclasses import dataclass
-from uuid import UUID, uuid4
+import uuid
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
 
 
-@dataclass
-class Proxy:
-    id: UUID
-    host: str
-    port: int
-    protocol: str
-    username: str | None = None
-    password: str | None = None
-    enabled: bool = True
+class Proxy(Base):
+    __tablename__ = "proxies"
 
-    @classmethod
-    def create(
-        cls,
-        host: str,
-        port: int,
-        protocol: str,
-        username: str | None = None,
-        password: str | None = None,
-        enabled: bool = True,
-    ) -> "Proxy":
-        return cls(
-            id=uuid4(),
-            host=host,
-            port=port,
-            protocol=protocol,
-            username=username,
-            password=password,
-            enabled=enabled,
-        )
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    host: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    port: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    protocol: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="http",
+    )
+
+    username: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    password: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
