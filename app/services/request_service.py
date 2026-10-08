@@ -1,6 +1,6 @@
 import random
 from uuid import UUID
-
+import asyncio
 from app.executors.browser_executer import execute_browser_request
 from app.executors.http_executor import execute_http_request
 from app.repositories.proxy_repository import ProxyRepository
@@ -54,3 +54,28 @@ class RequestService:
             )
 
         raise ValueError(f"Unsupported request mode: {mode}")
+    
+    async def execute_batch(
+        self,
+        url: str,
+        proxy_id: UUID | None = None,
+        mode: str = "http",
+        count: int = 1,
+        concurrency: int = 1,
+    ) -> list[dict]:
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def execute_one() -> dict:
+            async with semaphore:
+                return await self.execute(
+                    url=url,
+                    proxy_id=proxy_id,
+                    mode=mode,
+                )
+
+        tasks = [
+            execute_one()
+            for _ in range(count)
+        ]
+
+        return await asyncio.gather(*tasks)
