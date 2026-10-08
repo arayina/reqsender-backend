@@ -23,10 +23,7 @@ def get_request_service(
     )
 
 
-@router.post(
-    "",
-    response_model=RequestResponse,
-)
+@router.post("", response_model=RequestResponse)
 async def execute_request(
     data: RequestCreate,
     service: RequestService = Depends(get_request_service),
@@ -35,6 +32,7 @@ async def execute_request(
         return await service.execute(
             url=data.url,
             proxy_id=data.proxy_id,
+            mode=data.mode,
         )
 
     except ValueError as exc:
