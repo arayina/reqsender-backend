@@ -74,8 +74,8 @@ class ExecutionService:
     ) -> AsyncIterator[dict]:
         if target_url_id is None:
             raise ValueError("target_url_id is required for batch execution")
-        if count < 1 or count > 100:
-            raise ValueError("count must be between 1 and 100")
+        if count < 1 or count > 20000:
+            raise ValueError("count must be between 1 and 20000")
         if concurrency < 1 or concurrency > 20:
             raise ValueError("concurrency must be between 1 and 20")
         if concurrency > count:
@@ -168,19 +168,27 @@ class ExecutionService:
                 "metrics": build_metrics(),
             }
 
-            tasks = {
-                asyncio.create_task(execute_one_task(index))
-                for index in range(1, count + 1)
-            }
-            pending = tasks.copy()
+            # Keep only a bounded number of tasks alive. Creating all 20,000
+            # tasks up front wastes memory even though the semaphore limits
+            # the number that can execute concurrently.
+            next_index = 1
+            while next_index <= count and len(tasks) < concurrency:
+                tasks.add(asyncio.create_task(execute_one_task(next_index)))
+                next_index += 1
 
-            while pending:
-                done, pending = await asyncio.wait(
-                    pending,
+            while tasks:
+                done, _pending = await asyncio.wait(
+                    tasks,
                     return_when=asyncio.FIRST_COMPLETED,
                 )
+
                 for task in done:
+                    tasks.remove(task)
                     yield task.result()
+
+                    if next_index <= count:
+                        tasks.add(asyncio.create_task(execute_one_task(next_index)))
+                        next_index += 1
 
             yield {
                 "type": "completed",
