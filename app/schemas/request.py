@@ -9,10 +9,9 @@ from app.schemas.browser import BrowserSettings
 class RequestCreate(BaseModel):
     url: str = Field(min_length=1, max_length=2048)
     proxy_id: UUID | None = None
+    target_url_id: UUID | None = None
     mode: Literal["http", "browser", "random"] = "http"
-    browser_settings: BrowserSettings = Field(
-        default_factory=BrowserSettings,
-    )
+    browser_settings: BrowserSettings = Field(default_factory=BrowserSettings)
 
 
 class RequestResponse(BaseModel):
@@ -23,45 +22,16 @@ class RequestResponse(BaseModel):
     title: str | None = None
     error: str | None = None
 
+
 class BatchRequestCreate(BaseModel):
-    target_url_id: UUID | None = None
-    
-    url: str = Field(
-        min_length=1,
-        max_length=2048,
-    )
-
-    proxy_ids: list[UUID] = Field(
-        default_factory=list,
-    )
-
-    proxy_strategy: Literal[
-        "fixed",
-        "round_robin",
-        "random",
-    ] = "fixed"
-
-    mode: Literal[
-        "http",
-        "browser",
-        "random",
-    ] = "http"
-
-    count: int = Field(
-        default=1,
-        ge=1,
-        le=100,
-    )
-
-    concurrency: int = Field(
-        default=1,
-        ge=1,
-        le=20,
-    )
-
-    browser_settings: BrowserSettings = Field(
-        default_factory=BrowserSettings,
-    )
+    target_url_id: UUID
+    url: str = Field(min_length=1, max_length=2048)
+    proxy_ids: list[UUID] = Field(default_factory=list)
+    proxy_strategy: Literal["fixed", "round_robin", "random"] = "fixed"
+    mode: Literal["http", "browser", "random"] = "http"
+    count: int = Field(default=1, ge=1, le=100)
+    concurrency: int = Field(default=1, ge=1, le=20)
+    browser_settings: BrowserSettings = Field(default_factory=BrowserSettings)
 
 
 class BatchRequestResponse(BaseModel):
