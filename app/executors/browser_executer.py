@@ -21,9 +21,13 @@ async def execute_browser_request(
     if proxy:
         proxy_config = {
             "server": f"{proxy.protocol}://{proxy.host}:{proxy.port}",
-            "username": proxy.username,
-            "password": proxy.password,
         }
+
+        if proxy.username:
+            proxy_config["username"] = proxy.username
+
+        if proxy.password:
+            proxy_config["password"] = proxy.password
 
     started_at = time.perf_counter()
     browser = None
