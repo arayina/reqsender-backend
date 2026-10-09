@@ -9,7 +9,7 @@ class TargetUrlSettingsUpdate(BaseModel):
     connection: Literal["direct", "proxy"] = "direct"
     proxy_strategy: Literal["fixed", "round_robin", "random"] = "round_robin"
     proxy_ids: list[UUID] = Field(default_factory=list, max_length=20)
-    count: int = Field(default=10, ge=1, le=100)
+    count: int = Field(default=10, ge=1, le=20000)
     concurrency: int = Field(default=2, ge=1, le=20)
     show_browser: bool = False
     delay_before_navigation_ms: int = Field(default=0, ge=0, le=60000)
