@@ -4,6 +4,7 @@ import asyncio
 from app.executors.browser_executer import execute_browser_request
 from app.executors.http_executor import execute_http_request
 from app.repositories.proxy_repository import ProxyRepository
+from app.schemas.browser import BrowserSettings
 
 
 class RequestService:
@@ -15,6 +16,7 @@ class RequestService:
         url: str,
         proxy_id: UUID | None = None,
         mode: str = "http",
+        browser_settings: BrowserSettings | None = None,
     ) -> dict:
         proxy = None
 
@@ -37,6 +39,7 @@ class RequestService:
             return await execute_browser_request(
                 url=url,
                 proxy=proxy,
+                settings=browser_settings,
             )
 
         if mode == "random":
@@ -51,6 +54,7 @@ class RequestService:
             return await execute_browser_request(
                 url=url,
                 proxy=proxy,
+                settings=browser_settings,
             )
 
         raise ValueError(f"Unsupported request mode: {mode}")
@@ -71,6 +75,7 @@ class RequestService:
                     url=url,
                     proxy_id=proxy_id,
                     mode=mode,
+                    browser_settings=browser_settings,
                 )
 
         tasks = [

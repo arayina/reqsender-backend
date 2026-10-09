@@ -7,6 +7,7 @@ from uuid import UUID
 from app.executors.browser_executer import execute_browser_request
 from app.executors.http_executor import execute_http_request
 from app.repositories.proxy_repository import ProxyRepository
+from app.schemas.browser import BrowserSettings
 
 
 class ExecutionService:
@@ -21,6 +22,7 @@ class ExecutionService:
         url: str,
         proxy_id: UUID | None = None,
         mode: str = "http",
+        browser_settings: BrowserSettings | None = None,
     ) -> dict:
         proxy = None
 
@@ -49,6 +51,7 @@ class ExecutionService:
             return await execute_browser_request(
                 url=url,
                 proxy=proxy,
+                settings=browser_settings,
             )
 
         if mode == "random":
@@ -65,6 +68,7 @@ class ExecutionService:
             return await execute_browser_request(
                 url=url,
                 proxy=proxy,
+                settings=browser_settings,
             )
 
         raise ValueError(
@@ -107,6 +111,7 @@ class ExecutionService:
         mode: str,
         count: int,
         concurrency: int,
+        browser_settings: BrowserSettings | None = None,
     ) -> AsyncIterator[dict]:
         semaphore = asyncio.Semaphore(
             concurrency
@@ -190,6 +195,7 @@ class ExecutionService:
                         url=url,
                         proxy_id=selected_proxy_id,
                         mode=mode,
+                        browser_settings=browser_settings,
                     )
 
                 except asyncio.CancelledError:

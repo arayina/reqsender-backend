@@ -3,11 +3,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas.browser import BrowserSettings
+
 
 class RequestCreate(BaseModel):
     url: str = Field(min_length=1, max_length=2048)
     proxy_id: UUID | None = None
     mode: Literal["http", "browser", "random"] = "http"
+    browser_settings: BrowserSettings = Field(
+        default_factory=BrowserSettings,
+    )
 
 
 class RequestResponse(BaseModel):
@@ -50,6 +55,10 @@ class BatchRequestCreate(BaseModel):
         default=1,
         ge=1,
         le=20,
+    )
+
+    browser_settings: BrowserSettings = Field(
+        default_factory=BrowserSettings,
     )
 
 

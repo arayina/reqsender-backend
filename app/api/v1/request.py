@@ -53,13 +53,14 @@ async def execute_request(
             url=data.url,
             proxy_id=data.proxy_id,
             mode=data.mode,
+            browser_settings=data.browser_settings,
         )
 
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
-        )
+        ) from exc
 
 
 @router.post(
@@ -82,6 +83,7 @@ async def execute_batch_request(
             mode=data.mode,
             count=data.count,
             concurrency=data.concurrency,
+            browser_settings=data.browser_settings,
         ):
             if event["type"] == "progress":
                 events.append(event)
@@ -108,7 +110,7 @@ async def execute_batch_request(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
-        )
+        ) from exc
 
 
 @router.post(
@@ -129,6 +131,7 @@ async def execute_batch_stream(
                 mode=data.mode,
                 count=data.count,
                 concurrency=data.concurrency,
+                browser_settings=data.browser_settings,
             ):
                 yield (
                     f"data: "
