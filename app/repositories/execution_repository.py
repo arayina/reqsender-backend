@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, Integer
 from sqlalchemy.orm import Session
 
 from app.models.execution import Execution
