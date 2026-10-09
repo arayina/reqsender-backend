@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.repositories.execution_repository import ExecutionRepository
 from app.repositories.proxy_repository import ProxyRepository
 from app.schemas.request import (
     BatchRequestCreate,
@@ -35,6 +36,7 @@ def get_execution_service(
 ) -> ExecutionService:
     return ExecutionService(
         proxy_repository=ProxyRepository(db),
+        execution_repository=ExecutionRepository(db),
     )
 
 
@@ -84,6 +86,7 @@ async def execute_batch_request(
             count=data.count,
             concurrency=data.concurrency,
             browser_settings=data.browser_settings,
+            target_url_id=data.target_url_id,
         ):
             if event["type"] == "progress":
                 events.append(event)
@@ -132,6 +135,7 @@ async def execute_batch_stream(
                 count=data.count,
                 concurrency=data.concurrency,
                 browser_settings=data.browser_settings,
+                target_url_id=data.target_url_id,
             ):
                 yield (
                     f"data: "

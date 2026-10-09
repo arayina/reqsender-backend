@@ -3,9 +3,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from app import models
 from app.core.config import DATABASE_URL
 from app.core.database import Base
-from app.models import Proxy
 
 
 config = context.config
@@ -14,15 +14,12 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 
-# Tell Alembic about our SQLAlchemy models
 target_metadata = Base.metadata
 
-# Use the same database URL as the application
 config.set_main_option(
     "sqlalchemy.url",
     DATABASE_URL.replace("%", "%%"),
 )
-
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""

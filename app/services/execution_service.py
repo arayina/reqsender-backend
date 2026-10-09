@@ -6,6 +6,7 @@ from uuid import UUID
 
 from app.executors.browser_executer import execute_browser_request
 from app.executors.http_executor import execute_http_request
+from app.repositories.execution_repository import ExecutionRepository
 from app.repositories.proxy_repository import ProxyRepository
 from app.schemas.browser import BrowserSettings
 
@@ -14,8 +15,10 @@ class ExecutionService:
     def __init__(
         self,
         proxy_repository: ProxyRepository,
+        execution_repository: ExecutionRepository,
     ):
         self.proxy_repository = proxy_repository
+        self.execution_repository = execution_repository
 
     async def execute_one(
         self,
@@ -27,53 +30,42 @@ class ExecutionService:
         proxy = None
 
         if proxy_id is not None:
-            proxy = self.proxy_repository.get_by_id(
-                proxy_id
-            )
+            proxy = self.proxy_repository.get_by_id(proxy_id)
 
             if proxy is None:
-                raise ValueError(
-                    "Proxy not found"
-                )
+                raise ValueError("Proxy not found")
 
             if not proxy.enabled:
-                raise ValueError(
-                    "Proxy is disabled"
-                )
+                raise ValueError("Proxy is disabled")
 
-        if mode == "http":
-            return await execute_http_request(
-                url=url,
-                proxy=proxy,
-            )
-
-        if mode == "browser":
-            return await execute_browser_request(
-                url=url,
-                proxy=proxy,
-                settings=browser_settings,
-            )
+        actual_mode = mode
 
         if mode == "random":
-            selected_mode = random.choice(
+            actual_mode = random.choice(
                 ["http", "browser"]
             )
 
-            if selected_mode == "http":
-                return await execute_http_request(
-                    url=url,
-                    proxy=proxy,
-                )
+        if actual_mode == "http":
+            result = await execute_http_request(
+                url=url,
+                proxy=proxy,
+            )
 
-            return await execute_browser_request(
+        elif actual_mode == "browser":
+            result = await execute_browser_request(
                 url=url,
                 proxy=proxy,
                 settings=browser_settings,
             )
 
-        raise ValueError(
-            f"Unsupported request mode: {mode}"
-        )
+        else:
+            raise ValueError(
+                f"Unsupported request mode: {mode}"
+            )
+
+        result["execution_mode"] = actual_mode
+
+        return result
 
     def select_proxy_id(
         self,
@@ -112,6 +104,7 @@ class ExecutionService:
         count: int,
         concurrency: int,
         browser_settings: BrowserSettings | None = None,
+        target_url_id: UUID | None = None,
     ) -> AsyncIterator[dict]:
         semaphore = asyncio.Semaphore(
             concurrency
@@ -209,9 +202,25 @@ class ExecutionService:
                         "final_url": None,
                         "title": None,
                         "error": str(exc),
+                        "execution_mode": mode,
                     }
+                    
 
                 completed += 1
+                
+                self.execution_repository.create(
+                    target_url_id=target_url_id,
+                    proxy_id=selected_proxy_id,
+                    execution_mode=result.get(
+                        "execution_mode",
+                        mode,
+                    ),
+                    success=result["success"],
+                    status_code=result.get("status_code"),
+                    latency_ms=result.get("latency_ms", 0) or 0,
+                    final_url=result.get("final_url"),
+                    error=result.get("error"),
+                )
 
                 latency_ms = result.get(
                     "latency_ms",

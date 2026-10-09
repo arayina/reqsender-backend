@@ -24,6 +24,8 @@ class RequestResponse(BaseModel):
     error: str | None = None
 
 class BatchRequestCreate(BaseModel):
+    target_url_id: UUID | None = None
+    
     url: str = Field(
         min_length=1,
         max_length=2048,
