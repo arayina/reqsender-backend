@@ -1,118 +1,178 @@
 import time
+from uuid import UUID
 
-from playwright.async_api import ProxySettings, async_playwright
+from playwright.async_api import Page
 
+from app.browser.browser_manager import browser_manager
 from app.models.proxy import Proxy
 from app.schemas.browser import BrowserSettings
 
 
-CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+CHROME_PATH = (
+    r"C:\Program Files\Google"
+    r"\Chrome\Application\chrome.exe"
+)
 
 
 async def execute_browser_request(
     url: str,
+    target_url_id: UUID,
     proxy: Proxy | None = None,
     settings: BrowserSettings | None = None,
 ) -> dict:
+
     settings = settings or BrowserSettings()
 
-    proxy_config: ProxySettings | None = None
-
-    if proxy:
-        proxy_config = {
-            "server": f"{proxy.protocol}://{proxy.host}:{proxy.port}",
-        }
-
-        if proxy.username:
-            proxy_config["username"] = proxy.username
-
-        if proxy.password:
-            proxy_config["password"] = proxy.password
-
     started_at = time.perf_counter()
-    browser = None
+
+    page: Page | None = None
+
+    # Direct browser uses its own context.
+    direct_playwright = None
+    direct_context = None
 
     try:
-        async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(
-                executable_path=CHROME_PATH,
-                headless=not settings.show_browser,
-                proxy=proxy_config,
+        # =====================================================
+        # DIRECT BROWSER
+        # =====================================================
+
+        if proxy is None:
+
+            from playwright.async_api import async_playwright
+
+            direct_playwright = (
+                await async_playwright().start()
             )
 
-            page = await browser.new_page()
-
-            if settings.delay_before_navigation_ms > 0:
-                await page.wait_for_timeout(
-                    settings.delay_before_navigation_ms
+            direct_context = (
+                await direct_playwright
+                .chromium
+                .launch_persistent_context(
+                    user_data_dir=(
+                        ".browser_profiles"
+                        "/direct"
+                    ),
+                    executable_path=CHROME_PATH,
+                    headless=not settings.show_browser,
                 )
-
-            response = await page.goto(
-                url,
-                wait_until="domcontentloaded",
-                timeout=settings.navigation_timeout_ms,
             )
 
-            if settings.wait_after_load_ms > 0:
-                await page.wait_for_timeout(
-                    settings.wait_after_load_ms
+            context = direct_context
+
+        # =====================================================
+        # PROXY BROWSER
+        # =====================================================
+
+        else:
+
+            session = (
+                await browser_manager.get_session(
+                    target_url_id=target_url_id,
+                    proxy=proxy,
+                    show_browser=settings.show_browser,
                 )
-
-            if settings.scroll_enabled:
-                before_scroll = await page.evaluate(
-                    "() => window.scrollY"
-                )
-
-                print(
-                    f"[Browser] "
-                    f"Before scroll: {before_scroll}px"
-                )
-
-                await page.mouse.wheel(
-                    0,
-                    settings.scroll_amount,
-                )
-
-                if settings.wait_after_scroll_ms > 0:
-                    await page.wait_for_timeout(
-                        settings.wait_after_scroll_ms
-                    )
-
-                after_scroll = await page.evaluate(
-                    "() => window.scrollY"
-                )
-
-                print(
-                    f"[Browser] "
-                    f"After scroll: {after_scroll}px"
-                )
-
-            if settings.delay_after_navigation_ms > 0:
-                await page.wait_for_timeout(
-                    settings.delay_after_navigation_ms
-                )
-
-            title = await page.title()
-
-            latency_ms = round(
-                (time.perf_counter() - started_at) * 1000,
-                2,
             )
 
-            return {
-                "success": True,
-                "status_code": response.status
+            context = session.context
+
+        # =====================================================
+        # CREATE PAGE
+        # =====================================================
+
+        page = await context.new_page()
+
+        # -----------------------------------------------------
+        # Delay before navigation
+        # -----------------------------------------------------
+
+        if settings.delay_before_navigation_ms > 0:
+            await page.wait_for_timeout(
+                settings.delay_before_navigation_ms
+            )
+
+        # -----------------------------------------------------
+        # Navigation
+        # -----------------------------------------------------
+
+        response = await page.goto(
+            url,
+            wait_until="domcontentloaded",
+            timeout=settings.navigation_timeout_ms,
+        )
+
+        # -----------------------------------------------------
+        # Wait after load
+        # -----------------------------------------------------
+
+        if settings.wait_after_load_ms > 0:
+            await page.wait_for_timeout(
+                settings.wait_after_load_ms
+            )
+
+        # -----------------------------------------------------
+        # Scroll
+        # -----------------------------------------------------
+
+        if settings.scroll_enabled:
+            await page.mouse.wheel(
+                0,
+                settings.scroll_amount,
+            )
+
+            if settings.wait_after_scroll_ms > 0:
+                await page.wait_for_timeout(
+                    settings.wait_after_scroll_ms
+                )
+
+        # -----------------------------------------------------
+        # Additional delay
+        # -----------------------------------------------------
+
+        if settings.delay_after_navigation_ms > 0:
+            await page.wait_for_timeout(
+                settings.delay_after_navigation_ms
+            )
+
+        # -----------------------------------------------------
+        # Title
+        # -----------------------------------------------------
+
+        title = await page.title()
+
+        # -----------------------------------------------------
+        # Metrics
+        # -----------------------------------------------------
+
+        latency_ms = round(
+            (
+                time.perf_counter()
+                - started_at
+            )
+            * 1000,
+            2,
+        )
+
+        return {
+            "success": True,
+            "status_code": (
+                response.status
                 if response
-                else None,
-                "latency_ms": latency_ms,
-                "final_url": page.url,
-                "title": title,
-                "error": None,
-            }
+                else None
+            ),
+            "latency_ms": latency_ms,
+            "final_url": page.url,
+            "title": title,
+            "error": None,
+        }
 
     except Exception as exc:
+
         latency_ms = round(
-            (time.perf_counter() - started_at) * 1000,
+            (
+                time.perf_counter()
+                - started_at
+            )
+            * 1000,
             2,
         )
 
@@ -126,8 +186,37 @@ async def execute_browser_request(
         }
 
     finally:
-        if browser is not None:
+
+        # =====================================================
+        # PAGE LIFECYCLE
+        #
+        # Every request gets a new Page.
+        # Page is always closed after the request.
+        # =====================================================
+
+        if page is not None:
             try:
-                await browser.close()
+                await page.close()
+            except Exception:
+                pass
+
+        # =====================================================
+        # DIRECT BROWSER LIFECYCLE
+        #
+        # Direct browsers are not managed by BrowserManager,
+        # so close their context after the request.
+        #
+        # Proxy browsers stay alive until close_target().
+        # =====================================================
+
+        if direct_context is not None:
+            try:
+                await direct_context.close()
+            except Exception:
+                pass
+
+        if direct_playwright is not None:
+            try:
+                await direct_playwright.stop()
             except Exception:
                 pass
