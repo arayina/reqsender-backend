@@ -18,13 +18,39 @@ class RequestResponse(BaseModel):
     title: str | None = None
     error: str | None = None
 
-
 class BatchRequestCreate(BaseModel):
-    url: str = Field(min_length=1, max_length=2048)
-    proxy_id: UUID | None = None
-    mode: Literal["http", "browser", "random"] = "http"
-    count: int = Field(default=1, ge=1, le=100)
-    concurrency: int = Field(default=1, ge=1, le=20)
+    url: str = Field(
+        min_length=1,
+        max_length=2048,
+    )
+
+    proxy_ids: list[UUID] = Field(
+        default_factory=list,
+    )
+
+    proxy_strategy: Literal[
+        "fixed",
+        "round_robin",
+        "random",
+    ] = "fixed"
+
+    mode: Literal[
+        "http",
+        "browser",
+        "random",
+    ] = "http"
+
+    count: int = Field(
+        default=1,
+        ge=1,
+        le=100,
+    )
+
+    concurrency: int = Field(
+        default=1,
+        ge=1,
+        le=20,
+    )
 
 
 class BatchRequestResponse(BaseModel):

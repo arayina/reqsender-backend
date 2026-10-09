@@ -10,7 +10,10 @@ from app.repositories.proxy_repository import ProxyRepository
 
 
 class ExecutionService:
-    def __init__(self, proxy_repository: ProxyRepository):
+    def __init__(
+        self,
+        proxy_repository: ProxyRepository,
+    ):
         self.proxy_repository = proxy_repository
 
     async def execute_one(
@@ -22,13 +25,19 @@ class ExecutionService:
         proxy = None
 
         if proxy_id is not None:
-            proxy = self.proxy_repository.get_by_id(proxy_id)
+            proxy = self.proxy_repository.get_by_id(
+                proxy_id
+            )
 
             if proxy is None:
-                raise ValueError("Proxy not found")
+                raise ValueError(
+                    "Proxy not found"
+                )
 
             if not proxy.enabled:
-                raise ValueError("Proxy is disabled")
+                raise ValueError(
+                    "Proxy is disabled"
+                )
 
         if mode == "http":
             return await execute_http_request(
@@ -62,15 +71,46 @@ class ExecutionService:
             f"Unsupported request mode: {mode}"
         )
 
+    def select_proxy_id(
+        self,
+        proxy_ids: list[UUID],
+        strategy: str,
+        index: int,
+    ) -> UUID | None:
+        """
+        Select a proxy for a request based on strategy.
+        """
+
+        if not proxy_ids:
+            return None
+
+        if strategy == "fixed":
+            return proxy_ids[0]
+
+        if strategy == "round_robin":
+            return proxy_ids[
+                (index - 1) % len(proxy_ids)
+            ]
+
+        if strategy == "random":
+            return random.choice(proxy_ids)
+
+        raise ValueError(
+            f"Unsupported proxy strategy: {strategy}"
+        )
+
     async def execute_batch_stream(
         self,
         url: str,
-        proxy_id: UUID | None,
+        proxy_ids: list[UUID],
+        proxy_strategy: str,
         mode: str,
         count: int,
         concurrency: int,
     ) -> AsyncIterator[dict]:
-        semaphore = asyncio.Semaphore(concurrency)
+        semaphore = asyncio.Semaphore(
+            concurrency
+        )
 
         started_at = time.perf_counter()
 
@@ -83,10 +123,13 @@ class ExecutionService:
 
         def build_metrics() -> dict:
             elapsed_ms = (
-                time.perf_counter() - started_at
+                time.perf_counter()
+                - started_at
             ) * 1000
 
-            elapsed_seconds = elapsed_ms / 1000
+            elapsed_seconds = (
+                elapsed_ms / 1000
+            )
 
             average_latency_ms = (
                 total_latency_ms / completed
@@ -134,10 +177,18 @@ class ExecutionService:
             nonlocal total_latency_ms
 
             async with semaphore:
+                selected_proxy_id = (
+                    self.select_proxy_id(
+                        proxy_ids=proxy_ids,
+                        strategy=proxy_strategy,
+                        index=index,
+                    )
+                )
+
                 try:
                     result = await self.execute_one(
                         url=url,
-                        proxy_id=proxy_id,
+                        proxy_id=selected_proxy_id,
                         mode=mode,
                     )
 
@@ -175,6 +226,11 @@ class ExecutionService:
                     "total": count,
                     "success": success,
                     "failed": failed,
+                    "proxy_id": (
+                        str(selected_proxy_id)
+                        if selected_proxy_id
+                        else None
+                    ),
                     "result": result,
                     "metrics": build_metrics(),
                 }
@@ -193,7 +249,10 @@ class ExecutionService:
                 asyncio.create_task(
                     execute_one_task(index)
                 )
-                for index in range(1, count + 1)
+                for index in range(
+                    1,
+                    count + 1,
+                )
             }
 
             pending = tasks.copy()
@@ -217,8 +276,8 @@ class ExecutionService:
             }
 
         finally:
-            # If the client disconnects / aborts the SSE stream,
-            # cancel every task that is still running or waiting.
+            # Cancel remaining tasks if the client
+            # disconnects or aborts the SSE stream.
             for task in tasks:
                 if not task.done():
                     task.cancel()

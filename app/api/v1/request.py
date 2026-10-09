@@ -105,7 +105,8 @@ async def execute_batch_stream(
         try:
             async for event in service.execute_batch_stream(
                 url=data.url,
-                proxy_id=data.proxy_id,
+                proxy_ids=data.proxy_ids,
+                proxy_strategy=data.proxy_strategy,
                 mode=data.mode,
                 count=data.count,
                 concurrency=data.concurrency,
