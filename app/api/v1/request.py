@@ -56,6 +56,7 @@ async def execute_request(
             proxy_id=data.proxy_id,
             mode=data.mode,
             browser_settings=data.browser_settings,
+            target_url_id=data.target_url_id,
         )
 
     except ValueError as exc:
