@@ -29,7 +29,7 @@ class BatchRequestCreate(BaseModel):
     proxy_ids: list[UUID] = Field(default_factory=list)
     proxy_strategy: Literal["fixed", "round_robin", "random"] = "fixed"
     mode: Literal["http", "browser", "random"] = "http"
-    count: int = Field(default=1, ge=1, le=100)
+    count: int = Field(default=1, ge=1, le=20000)
     concurrency: int = Field(default=1, ge=1, le=20)
     browser_settings: BrowserSettings = Field(default_factory=BrowserSettings)
 
