@@ -55,8 +55,17 @@ async def execute_browser_request(
                 )
 
             if settings.scroll_enabled:
-                await page.evaluate(
-                    "(amount) => window.scrollBy(0, amount)",
+                before_scroll = await page.evaluate(
+                    "() => window.scrollY"
+                )
+
+                print(
+                    f"[Browser] "
+                    f"Before scroll: {before_scroll}px"
+                )
+
+                await page.mouse.wheel(
+                    0,
                     settings.scroll_amount,
                 )
 
@@ -64,6 +73,15 @@ async def execute_browser_request(
                     await page.wait_for_timeout(
                         settings.wait_after_scroll_ms
                     )
+
+                after_scroll = await page.evaluate(
+                    "() => window.scrollY"
+                )
+
+                print(
+                    f"[Browser] "
+                    f"After scroll: {after_scroll}px"
+                )
 
             if settings.delay_after_navigation_ms > 0:
                 await page.wait_for_timeout(
@@ -79,7 +97,9 @@ async def execute_browser_request(
 
             return {
                 "success": True,
-                "status_code": response.status if response else None,
+                "status_code": response.status
+                if response
+                else None,
                 "latency_ms": latency_ms,
                 "final_url": page.url,
                 "title": title,
